@@ -921,7 +921,6 @@ func (ps *PieceDirectory) BlockstoreGetSize(ctx context.Context, c cid.Cid) (int
 		}
 
 		return int(offsetSize.Size), nil
-
 	}
 
 	return 0, merr
