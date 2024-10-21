@@ -37,29 +37,45 @@ type CurrentDealInfo struct {
 }
 
 func (c *ChainDealManager) WaitForPublishDeals(ctx context.Context, publishCid cid.Cid, proposal market8.DealProposal) (*types.PublishDealsWaitResult, error) {
-	// Wait for deal to be published (plus additional time for confidence)
-	receipt, err := c.fullnodeApi.StateWaitMsg(ctx, publishCid, c.cfg.PublishDealsConfidence, api.LookbackNoLimit, true)
-	if err != nil {
-		return nil, fmt.Errorf("WaitForPublishDeals errored: %w", err)
-	}
-	if receipt.Receipt.ExitCode != exitcode.Ok {
-		return nil, fmt.Errorf("WaitForPublishDeals exit code: %s", receipt.Receipt.ExitCode)
-	}
+	// Retry logic for message replacement
+	for {
+		// Wait for deal to be published (plus additional time for confidence)
+		receipt, err := c.fullnodeApi.StateWaitMsg(ctx, publishCid, c.cfg.PublishDealsConfidence, api.LookbackNoLimit, true)
+		if err != nil {
+			// Check if the error is due to a message with the same nonce
+			if replacementErr, ok := err.(*api.ErrMessageReplacement); ok {
+				// If a replacement message is found, handle it gracefully by accepting it
+				log.Warnf("Found replacement message with equal nonce, waiting for confirmation of replacement: %v", replacementErr.MessageCid)
+				// Update publishCid with the new CID from the replacement message
+				publishCid = replacementErr.MessageCid
+				// Continue waiting for the replacement message to confirm
+				continue
+			}
+			// If it's a different kind of error, return it
+			return nil, fmt.Errorf("WaitForPublishDeals errored: %w", err)
+		}
 
-	// The deal ID may have changed since publish if there was a reorg, so
-	// get the current deal ID
-	head, err := c.fullnodeApi.ChainHead(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("WaitForPublishDeals failed to get chain head: %w", err)
-	}
+		// If the message receipt indicates an error, handle it
+		if receipt.Receipt.ExitCode != exitcode.Ok {
+			return nil, fmt.Errorf("WaitForPublishDeals exit code: %s", receipt.Receipt.ExitCode)
+		}
 
-	res, err := c.GetCurrentDealInfo(ctx, head.Key(), (*market.DealProposal)(&proposal), publishCid)
-	if err != nil {
-		return nil, fmt.Errorf("WaitForPublishDeals getting deal info errored: %w", err)
-	}
+		// The deal ID may have changed since publish if there was a reorg, so
+		// get the current deal ID
+		head, err := c.fullnodeApi.ChainHead(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("WaitForPublishDeals failed to get chain head: %w", err)
+		}
 
-	return &types.PublishDealsWaitResult{DealID: res.DealID, FinalCid: receipt.Message}, nil
+		res, err := c.GetCurrentDealInfo(ctx, head.Key(), (*market.DealProposal)(&proposal), publishCid)
+		if err != nil {
+			return nil, fmt.Errorf("WaitForPublishDeals getting deal info errored: %w", err)
+		}
+
+		return &types.PublishDealsWaitResult{DealID: res.DealID, FinalCid: receipt.Message}, nil
+	}
 }
+
 
 // GetCurrentDealInfo gets the current deal state and deal ID.
 // Note that the deal ID is assigned when the deal is published, so it may
