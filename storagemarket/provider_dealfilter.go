@@ -49,31 +49,32 @@ func (p *Provider) getDealFilterParams(deal *types.ProviderDealState) (*dealfilt
 		}
 	}
 
+	// Commented out for Curio. It's killing the SQL queries.
 	// Get the status of storage space
-	storageStatus, err := storagespace.GetStatus(p.ctx, p.storageManager, p.dealsDB)
-	if err != nil {
-		return nil, &acceptError{
-			error:         fmt.Errorf("storage deal filter: failed to fetch storage status: %w", err),
-			reason:        "server error: storage deal filter: getting storage status",
-			isSevereError: true,
-		}
-	}
+	//storageStatus, err := storagespace.GetStatus(p.ctx, p.storageManager, p.dealsDB)
+	//if err != nil {
+	//	return nil, &acceptError{
+	//		error:         fmt.Errorf("storage deal filter: failed to fetch storage status: %w", err),
+	//		reason:        "server error: storage deal filter: getting storage status",
+	//		isSevereError: true,
+	//	}
+	//}
 
 	// Check cached sealing pipeline status and error
-	sealingStatus, err := p.sealingPipelineStatus()
-	if err != nil {
-		return nil, &acceptError{
-			error:         fmt.Errorf("storage deal filter: failed to fetch sealing pipeline status: %w", err),
-			reason:        "server error: storage deal filter: getting sealing status",
-			isSevereError: true,
-		}
-	}
+	//sealingStatus, err := p.sealingPipelineStatus()
+	//if err != nil {
+	//	return nil, &acceptError{
+	//		error:         fmt.Errorf("storage deal filter: failed to fetch sealing pipeline status: %w", err),
+	//		reason:        "server error: storage deal filter: getting sealing status",
+	//		isSevereError: true,
+	//	}
+	//}
 
 	return &dealfilter.DealFilterParams{
 		DealParams:           params,
-		SealingPipelineState: sealingStatus,
+		//SealingPipelineState: sealingStatus,
 		FundsState:           *fundsStatus,
-		StorageState:         *storageStatus,
+		//StorageState:         *storageStatus,
 	}, nil
 }
 
